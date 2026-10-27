@@ -1,0 +1,62 @@
+name: CI/CD Deploy GitHub Pages
+
+# Khi nào pipeline chạy: mỗi lần push lên nhánh main
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Quyền cần thiết để deploy lên GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  # JOB 1 (CI): kiểm tra code
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Kiểm tra đủ 3 file
+        run: |
+          for f in index.html style.css script.js; do
+            if [ ! -f "$f" ]; then
+              echo "LỖI: thiếu file $f"
+              exit 1
+            fi
+            echo "OK: có file $f"
+          done
+
+      - name: Kiểm tra thẻ title trong index.html
+        run: |
+          if ! grep -q "<title>" index.html; then
+            echo "LỖI: index.html không có thẻ <title>"
+            exit 1
+          fi
+          echo "OK: index.html có thẻ <title>"
+
+  # JOB 2 (CD): deploy lên GitHub Pages, chỉ chạy khi check thành công
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cấu hình GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Đóng gói website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."
+
+      - name: Deploy lên GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
